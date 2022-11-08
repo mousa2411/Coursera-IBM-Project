@@ -1,0 +1,621 @@
+
+We load a dataset using Pandas library, and apply the following algorithms, and find the best one for this specific dataset by accuracy evaluation methods.
+
+Lets first load required libraries:
+
+import itertools
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import NullFormatter
+import pandas as pd
+import numpy as np
+import matplotlib.ticker as ticker
+from sklearn import preprocessing
+%matplotlib inline
+
+### About dataset
+
+This dataset is about past loans. The __Loan_train.csv__ data set includes details of 346 customers whose loan are already paid off or defaulted. It includes following fields:
+
+| Field          | Description                                                                           |
+|----------------|---------------------------------------------------------------------------------------|
+| Loan_status    | Whether a loan is paid off on in collection                                           |
+| Principal      | Basic principal loan amount at the                                                    |
+| Terms          | Origination terms which can be weekly (7 days), biweekly, and monthly payoff schedule |
+| Effective_date | When the loan got originated and took effects                                         |
+| Due_date       | Since it’s one-time payoff schedule, each loan has one single due date                |
+| Age            | Age of applicant                                                                      |
+| Education      | Education of applicant                                                                |
+| Gender         | The gender of applicant                                                               |
+
+!pip install wget
+
+import wget
+wget.download("https://s3-api.us-geo.objectstorage.softlayer.net/cf-courses-data/CognitiveClass/ML0101ENv3/labs/loan_train.csv","loan_train.csv")
+
+Lets download the dataset
+
+!wget -O loan_train.csv https://s3-api.us-geo.objectstorage.softlayer.net/cf-courses-data/CognitiveClass/ML0101ENv3/labs/loan_train.csv
+
+### Load Data From CSV File  
+
+df = pd.read_csv('loan_train.csv')
+df.head()
+
+df.shape
+
+### Convert to date time object 
+
+df['due_date'] = pd.to_datetime(df['due_date'])
+df['effective_date'] = pd.to_datetime(df['effective_date'])
+df.head()
+
+# Data visualization and pre-processing
+
+
+
+Let’s see how many of each class is in our data set 
+
+df['loan_status'].value_counts()
+
+260 people have paid off the loan on time while 86 have gone into collection 
+
+
+Lets plot some columns to underestand data better:
+
+# notice: installing seaborn might takes a few minutes
+!conda install -c anaconda seaborn -y
+
+import seaborn as sns
+
+bins = np.linspace(df.Principal.min(), df.Principal.max(), 10)
+g = sns.FacetGrid(df, col="Gender", hue="loan_status", palette="Set1", col_wrap=2)
+g.map(plt.hist, 'Principal', bins=bins, ec="k")
+
+g.axes[-1].legend()
+plt.show()
+
+bins = np.linspace(df.age.min(), df.age.max(), 10)
+g = sns.FacetGrid(df, col="Gender", hue="loan_status", palette="Set1", col_wrap=2)
+g.map(plt.hist, 'age', bins=bins, ec="k")
+
+g.axes[-1].legend()
+plt.show()
+
+# Pre-processing:  Feature selection/extraction
+
+### Lets look at the day of the week people get the loan 
+
+df['dayofweek'] = df['effective_date'].dt.dayofweek
+bins = np.linspace(df.dayofweek.min(), df.dayofweek.max(), 10)
+g = sns.FacetGrid(df, col="Gender", hue="loan_status", palette="Set1", col_wrap=2)
+g.map(plt.hist, 'dayofweek', bins=bins, ec="k")
+g.axes[-1].legend()
+plt.show()
+
+
+We see that people who get the loan at the end of the week dont pay it off, so lets use Feature binarization to set a threshold values less then day 4 
+
+df['weekend'] = df['dayofweek'].apply(lambda x: 1 if (x>3)  else 0)
+df.head()
+
+## Convert Categorical features to numerical values
+
+Lets look at gender:
+
+df.groupby(['Gender'])['loan_status'].value_counts(normalize=True)
+
+86 % of female pay there loans while only 73 % of males pay there loan
+
+
+Lets convert male to 0 and female to 1:
+
+
+df['Gender'].replace(to_replace=['male','female'], value=[0,1],inplace=True)
+df.head()
+
+## One Hot Encoding  
+#### How about education?
+
+df.groupby(['education'])['loan_status'].value_counts(normalize=True)
+
+#### Feature befor One Hot Encoding
+
+df[['Principal','terms','age','Gender','education']].head()
+
+#### Use one hot encoding technique to conver categorical varables to binary variables and append them to the feature Data Frame 
+
+Feature = df[['Principal','terms','age','Gender','weekend']]
+Feature = pd.concat([Feature,pd.get_dummies(df['education'])], axis=1)
+Feature.drop(['Master or Above'], axis = 1,inplace=True)
+Feature.head()
+
+
+### Feature selection
+
+Lets defind feature sets, X:
+
+X = Feature
+X[0:5]
+
+What are our lables?
+
+y = df['loan_status'].values
+y[0:5]
+
+## Normalize Data 
+
+Data Standardization give data zero mean and unit variance (technically should be done after train test split )
+
+X= preprocessing.StandardScaler().fit(X).transform(X)
+X[0:5]
+
+# Classification 
+
+Now, it is your turn, use the training set to build an accurate model. Then use the test set to report the accuracy of the model
+You should use the following algorithm:
+- K Nearest Neighbor(KNN)
+- Decision Tree
+- Support Vector Machine
+- Logistic Regression
+
+
+
+__ Notice:__ 
+- You can go above and change the pre-processing, feature selection, feature-extraction, and so on, to make a better model.
+- You should use either scikit-learn, Scipy or Numpy libraries for developing the classification algorithms.
+- You should include the code of the algorithm in the following cells.
+
+# K Nearest Neighbor(KNN)
+Notice: You should find the best k to build the model with the best accuracy.  
+**warning:** You should not use the __loan_test.csv__ for finding the best k, however, you can split your train_loan.csv into train and test to find the best __k__.
+
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test =train_test_split(X,y,test_size=.20,random_state=37)
+k_range = range(1,20)
+scores = []
+
+for k in k_range:
+    knn = KNeighborsClassifier(n_neighbors = k)
+    knn.fit(X_train, y_train)
+    scores.append(knn.score(X_test, y_test))
+
+plt.figure()
+plt.xlabel('k')
+plt.ylabel('accuracy')
+plt.scatter(k_range, scores)
+plt.xticks([0,5,10,15,20]);
+
+# t = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
+
+# knn = KNeighborsClassifier(n_neighbors = 3)
+
+# plt.figure()
+
+# for s in t:
+
+#     scores = []
+#     for i in range(1,1000):
+#         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 1-s)
+#         knn.fit(X_train, y_train)
+#         scores.append(knn.score(X_test, y_test))
+#     plt.plot(s, np.mean(scores), 'bo')
+
+# plt.xlabel('Training set proportion (%)')
+# plt.ylabel('accuracy');
+
+#Best value at 80-20 split.
+
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2,random_state=37)
+#Fitting Model on whole data after hyperparameter selection
+knn_model=KNeighborsClassifier(n_neighbors = 3)
+knn_model.fit(X,y)
+
+#knn_model.score(X_test,y_test)
+
+
+
+# Decision Tree
+
+from sklearn.tree import DecisionTreeClassifier 
+# create a  object 
+model_dt = DecisionTreeClassifier()    
+# fit the regressor with X and Y data 
+model_dt.fit(X_train, y_train)
+
+model_dt.score(X_test,y_test)
+
+#from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
+
+tree_para = {'criterion':['gini','entropy'],'max_depth':range(1,30),'max_features':[None,int, float, "auto", "sqrt", "log2"]}
+clf = GridSearchCV(DecisionTreeClassifier(), tree_para, cv=5)
+clf.fit(X_train,y_train)
+
+clf.score(X_test,y_test)
+
+#Fitting Model on whole data after hyperparameter selection
+dt_model=clf.best_estimator_
+dt_model.fit(X,y)
+
+# Support Vector Machine
+
+from sklearn.svm import SVC
+
+clif=SVC(kernel="rbf")
+clif.fit(X_train,y_train)
+
+#accuracy score
+clif.score(X_test,y_test)
+
+from sklearn.model_selection import GridSearchCV
+ 
+# defining parameter range
+param_grid = {'C': [0.1, 1, 10, 100, 1000],
+              'gamma': [1, 0.1, 0.01, 0.001, 0.0001],
+              'kernel': ['rbf','linear']}
+ 
+grid = GridSearchCV(SVC(), param_grid, refit = True, verbose = 3)
+ 
+# fitting the model for grid search
+grid.fit(X_train, y_train)
+
+#Accuracy Score
+grid.score(X_test,y_test)
+
+#Fitting Model on whole data after hyperparameter selection
+svc_model=grid.best_estimator_
+
+svc_model.fit(X,y)
+
+
+
+# Logistic Regression
+
+from sklearn.linear_model import LogisticRegression 
+classifier = LogisticRegression() 
+classifier.fit(X_train, y_train) 
+
+#Accuracy Score
+classifier.score(X_test,y_test)
+
+log_model=LogisticRegression()
+log_model.fit(X,y)
+
+# Model Evaluation using Test set
+
+#from sklearn.metrics import jaccard_similarity_score
+from sklearn.metrics import f1_score
+from sklearn.metrics import log_loss
+
+from sklearn.metrics import jaccard_score
+
+
+
+First, download and load the test set:
+
+!wget -O loan_test.csv https://s3-api.us-geo.objectstorage.softlayer.net/cf-courses-data/CognitiveClass/ML0101ENv3/labs/loan_test.csv
+
+import wget
+wget.download("https://s3-api.us-geo.objectstorage.softlayer.net/cf-courses-data/CognitiveClass/ML0101ENv3/labs/loan_test.csv","loan_test.csv")
+
+### Load Test set for evaluation 
+
+test_df = pd.read_csv('loan_test.csv')
+test_df.head()
+
+test_df['due_date'] = pd.to_datetime(test_df['due_date'])
+test_df['effective_date'] = pd.to_datetime(test_df['effective_date'])
+test_df.head()
+
+test_df['dayofweek'] = test_df['effective_date'].dt.dayofweek
+test_df['weekend'] = test_df['dayofweek'].apply(lambda x: 1 if (x>3)  else 0)
+test_df.head()
+
+test_df['Gender'].replace(to_replace=['male','female'], value=[0,1],inplace=True)
+test_df.head()
+
+test_Feature = test_df[['Principal','terms','age','Gender','weekend']]
+test_Feature = pd.concat([test_Feature,pd.get_dummies(test_df['education'])], axis=1)
+test_Feature.drop(['Master or Above'], axis = 1,inplace=True)
+test_Feature.head()
+
+
+X1 = test_Feature
+X1[0:5]
+
+y1 = test_df['loan_status'].values
+y1[0:5]
+
+X1= preprocessing.StandardScaler().fit(X1).transform(X1)
+X1[0:5]
+
+
+
+# Report
+You should be able to report the accuracy of the built model using different evaluation metrics:
+
+| Algorithm          | Jaccard | F1-score | LogLoss |
+|--------------------|---------|----------|---------|
+| KNN                | ?       | ?        | NA      |
+| Decision Tree      | ?       | ?        | NA      |
+| SVM                | ?       | ?        | NA      |
+| LogisticRegression | ?       | ?        | ?       |
+
+s=[]
+for alog,model in [['KNN',knn_model],['Decision Tree',dt_model],['SVM',svc_model],['LogisticRegression',log_model]]:
+        y_pred=model.predict(X1)
+        jac=jaccard_score(y1,y_pred,pos_label='PAIDOFF')
+        f1=f1_score(y1,y_pred,average='weighted')
+        logl=np.nan
+        if alog=="LogisticRegression":
+            temp2=pd.DataFrame(data=[model.predict(X1),y1], index=['Y_Pred','Y_Actual']).T.replace(['PAIDOFF','COLLECTION'],[1,0])
+            logl=log_loss(temp2['Y_Actual'],temp2['Y_Pred'])
+        s.append((alog,jac,f1,logl))
+pd.DataFrame(s,columns=['Alogrithm','Jaccard','F1-score','LogLoss'])
+
+#LogisticRegression has best evaluation metrics scores.
+
+<h2>Want to learn more?</h2>
+
+IBM SPSS Modeler is a comprehensive analytics platform that has many machine learning algorithms. It has been designed to bring predictive intelligence to decisions made by individuals, by groups, by systems – by your enterprise as a whole. A free trial is available through this course, available here: <a href="http://cocl.us/ML0101EN-SPSSModeler">SPSS Modeler</a>
+
+Also, you can use Watson Studio to run these notebooks faster with bigger datasets. Watson Studio is IBM's leading cloud solution for data scientists, built by data scientists. With Jupyter notebooks, RStudio, Apache Spark and popular libraries pre-packaged in the cloud, Watson Studio enables data scientists to collaborate on their projects without having to install anything. Join the fast-growing community of Watson Studio users today with a free account at <a href="https://cocl.us/ML0101EN_DSX">Watson Studio</a>
+
+<h3>Thanks for completing this lesson!</h3>
+
+<h4>Author:  <a href="https://ca.linkedin.com/in/saeedaghabozorgi">Saeed Aghabozorgi</a></h4>
+<p><a href="https://ca.linkedin.com/in/saeedaghabozorgi">Saeed Aghabozorgi</a>, PhD is a Data Scientist in IBM with a track record of developing enterprise level applications that substantially increases clients’ ability to turn data into actionable knowledge. He is a researcher in data mining field and expert in developing advanced analytic methods like machine learning and statistical modelling on large datasets.</p>
+
+<hr>
+
+<p>Copyright &copy; 2018 <a href="https://cocl.us/DX0108EN_CC">Cognitive Class</a>. This notebook and its source code are released under the terms of the <a href="https://bigdatauniversity.com/mit-license/">MIT License</a>.</p>
+
+
+
+### ibm loan assignment end
+
+#### iri ths rf start
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+warnings.filterwarnings("ignore")
+from sklearn.feature_selection import RFE
+from sklearn.ensemble import RandomForestRegressor
+
+#from datetime import datetime
+#import calendar
+#from datetime import timedelta
+#import datetime as dt
+%matplotlib inline
+
+import xgboost as xg
+
+dff=pd.read_csv("C:/Users/703268354/Downloads/THS_SKU_Forecast_Model_Dataset.csv")
+
+df1=dff[["SKU","Month","Quantity_Sales","Profit_Center"]]
+
+df1=df1[df1.SKU=="7J1076T1367"] #cookie
+#df1=df1[df1.SKU=="J72075T1367"]
+
+df2=df1[["Month","Quantity_Sales"]]
+
+df2["Month"]=pd.to_datetime(df2["Month"])
+
+df2=df2.reset_index()
+df2.drop(["index"], axis=1,inplace=True)
+
+df=df2.copy()
+df.columns=["Month","Sales"]
+
+from statsmodels.tsa.stattools import adfuller
+
+def adfuller_test(sales):
+    result=adfuller(sales)
+    labels = ['ADF Test Statistic','p-value','#Lags Used','Number of Observations Used']
+    for value,label in zip(result,labels):
+        print(label+' : '+str(value) )
+    if result[1] <= 0.05:
+        print("strong evidence against the null hypothesis(Ho), reject the null hypothesis. Data has no unit root and is stationary")
+    else:
+        print("weak evidence against null hypothesis, time series has a unit root, indicating it is non-stationary ")
+    
+
+adfuller_test(df['Sales'].dropna())
+
+df['Sales_1'] = df['Sales'] - df['Sales'].shift(1)
+adfuller_test(df['Sales_1'].dropna())
+input1=df.copy()
+
+df['Sales_S2']=df['Sales_1'].shift(1)
+df['Sales_S3']=df['Sales_1'].shift(2)
+df['Sales_d2']=df['Sales_1']-df['Sales_1'].shift(1)
+
+df["Month_of_Year"]=df["Month"].dt.month
+df["Year"]=df["Month"].dt.year
+
+df7=df.copy()
+
+df=df.dropna()
+df
+
+x=df[["Sales_S2","Sales_S3","Month_of_Year","Year","Sales_d2"]]
+y=df["Sales_1"]
+
+l=26
+
+x_train=x.iloc[:l,]
+x_test=x.iloc[l:,]
+
+y_train=y.iloc[:l,]
+y_test=y.iloc[l:,]
+
+#rfe = RFE(RandomForestRegressor(n_estimators=100, random_state=1), 4)
+rfe = RandomForestRegressor(n_estimators=100, random_state=1)
+#rfe=xg.XGBRegressor(n_estimators=100)
+fit = rfe.fit(x_train, y_train)
+
+y_pred = fit.predict(x_test)
+
+y_test.to_list()
+
+np.mean((np.abs(y_pred-y_test.to_list()))*100/y_test.to_list())
+
+pred_all=fit.predict(x)
+
+np.mean((np.abs(pred_all-y.to_list()))*100/y.to_list())
+
+y1=y.copy()
+
+y1["Pred"]=pred_all
+
+pred=pd.DataFrame(pred_all)
+pred.index=y.index
+
+pred.columns=["prediction"]
+
+c=pd.DataFrame(merge["Sales"].iloc[:3])
+c.columns=pred.columns
+c
+
+merge=pd.concat([df7,pd.concat([pred,c])],axis=1)
+merge.head()
+
+merge["pred_norm"]=merge["prediction"].cumsum()-merge["prediction"][0]-merge["prediction"][1]
+
+merge["pred_norm"][0]=merge["prediction"][0]
+merge["pred_norm"][1]=merge["prediction"][1]
+merge
+
+merge[["Sales","pred_norm"]].plot()
+
+np.mean((np.abs(merge.pred_norm[3:l+3]-merge.Sales[3:l+3])*100/merge.Sales[3:l+3])) #train
+
+np.mean((np.abs(merge.pred_norm[l+3:]-merge.Sales[l+3:])*100/merge.Sales[l+3:]))  #test
+
+from sklearn.metrics import mean_squared_error
+
+rmse=np.sqrt(mean_squared_error(merge.Sales[l+3:],merge.pred_norm[l+3:]))
+rmse
+
+
+
+# creating 12 shift
+
+df=input1.copy()
+
+df['Sales_S2']=df['Sales_1'].shift(12)
+df['Sales_S3']=df['Sales_1'].shift(13)
+df['Sales_d2']=df['Sales_1'].shift(12)-df['Sales_1'].shift(13)
+
+df["Month_of_Year"]=df["Month"].dt.month
+df["Year"]=df["Month"].dt.year
+
+df7=df.copy()
+
+df=df.dropna()
+df
+
+x=df[["Sales_S2","Sales_S3","Month_of_Year","Year","Sales_d2"]]
+y=df["Sales_1"]
+
+x_train=x.iloc[:18,]
+x_test=x.iloc[18:,]
+
+y_train=y.iloc[:18,]
+y_test=y.iloc[18:,]
+
+#rfe = RFE(RandomForestRegressor(n_estimators=100, random_state=1), 4)
+rfe = RandomForestRegressor(n_estimators=100, random_state=1)
+#rfe=xg.XGBRegressor(n_estimators=100)
+fit = rfe.fit(x_train, y_train)
+
+y_pred = fit.predict(x_test)
+
+y_test.to_list()
+
+np.mean((np.abs(y_pred-y_test.to_list()))*100/y_test.to_list())
+
+pred_all=fit.predict(x)
+
+np.mean((np.abs(pred_all-y.to_list()))*100/y.to_list())
+
+y1=y.copy()
+
+y1["Pred"]=pred_all
+
+pred=pd.DataFrame(pred_all)
+pred.index=y.index
+
+pred.columns=["prediction"]
+
+c=pd.DataFrame(merge["Sales"].iloc[:14])
+c.columns=pred.columns
+c
+
+merge=pd.concat([df7,pd.concat([pred,c])],axis=1)
+merge.head()
+
+merge["pred_norm"]=merge["prediction"].cumsum()-merge["prediction"].cumsum()[12]
+for i in range(14):
+    merge["pred_norm"][i]=merge["prediction"][i]
+#merge["pred_norm"][1]=merge["prediction"][1]
+merge
+
+merge[["Sales","pred_norm"]].plot()
+
+np.mean((np.abs(merge.pred_norm[3:25]-merge.Sales[3:25])*100/merge.Sales[3:])) #train
+
+np.mean((np.abs(merge.pred_norm[25:]-merge.Sales[3:])*100/merge.Sales[25:]))  #test
+
+df4=input1.iloc[23:]
+
+df4['Sales_S2']=df4['Sales_1'].shift(1)
+df4['Sales_S3']=df4['Sales_1'].shift(2)
+df4['Sales_d2']=df4['Sales_1'].shift(2)-df['Sales_1'].shift(1)
+
+df4["Month_of_Year"]=df4["Month"].dt.month
+df4["Year"]=df4["Month"].dt.year+1
+df77=df4.copy()
+
+df4=df4.dropna()
+df4
+
+x_future=df4[["Sales_S2","Sales_S3","Month_of_Year","Year","Sales_d2"]]
+
+pred_future=fit.predict(x_future)
+
+#y1=y.copy()
+
+#y1["Pred"]=pred_future
+
+pred=pd.DataFrame(pred_future)
+pred.index=range(25,37)
+pred
+
+pred.columns=["prediction"]
+pred
+
+
+future=pd.concat([df77,pred],axis=1)
+future
+
+future["prediction"][23]=merge["pred_norm"][35]
+future["prediction"][24]=merge["pred_norm"][36]
+future
+
+future["pred_norm"]=future["prediction"].cumsum()-future["prediction"][23]
+future["pred_norm"][23]=merge["pred_norm"][35]
+future
+
+future1=future.copy()
+
+future.index=range(35,49)
+
+future.iloc[2:]["pred_norm"]
+
+pd.concat([merge,pd.DataFrame(future.iloc[1:]["pred_norm"])],axis=1)[["Sales","pred_norm"]].plot()
